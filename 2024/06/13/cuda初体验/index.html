@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="renderer" content="webkit">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="google-site-verification" content="TZE0rZyIqLl10trYu3BWBWa1Vmz6HFwhb2OcNEK4u-s" />
+     <link rel="shortcut icon" href= /img/favicon.ico >
+    <title>
+        博文小站
+    </title>
+    <meta name="description" content= 欢迎来访Born的博客，have a good day! >
+    <meta name="keywords" content= Blogs,BornHan,AI,CPP >
+    
+<link rel="stylesheet" href="/libs/highlight/styles/monokai-sublime.css">
+
+    
+<link rel="stylesheet" href="/libs/font-awesome/css/font-awesome.min.css">
+
+    
+<link rel="stylesheet" href="/css/style.css">
+
+<meta name="generator" content="Hexo 7.2.0"></head>
+<body id="bodyx">
+    <div class="hd posts">
+    <a href="/index.html"><i class="fa fa-home
+ replay-btn" aria-hidden="true"></i></a>
+    <div class="post-title">
+        <p>
+            
+        </p>
+        <hr>
+    </div>
+    <div class="post-content">
+        <h1 id="cuda学习博客"><a href="#cuda学习博客" class="headerlink" title="cuda学习博客"></a>cuda学习博客</h1><blockquote>
+<p>本文为本人cuda学习过程中的记录和理解，多参考@谭升等大佬前辈的博客，以及NVIDIA官方文档。如有错误烦请指正，如有侵权请联系删除。</p>
+</blockquote>
+<h2 id="0-并行计算与计算机架构"><a href="#0-并行计算与计算机架构" class="headerlink" title="0. 并行计算与计算机架构"></a>0. 并行计算与计算机架构</h2><p>计算机架构是并行计算或者说HPC领域中十分重要的内容。</p>
+<blockquote>
+<p>。。看书后期记得补充。。 </p>
+</blockquote>
+<p>无论是OpenMP还是CUDA，写并行程序主要是分解任务，在软件层面上大体可以分为‘指令并行’和‘数据并行’。</p>
+<h2 id="1-异构计算与CUDA"><a href="#1-异构计算与CUDA" class="headerlink" title="1. 异构计算与CUDA"></a>1. 异构计算与CUDA</h2><h3 id="cuda基础"><a href="#cuda基础" class="headerlink" title="cuda基础"></a>cuda基础</h3><p>进入正题，我们从hello world开始学习cuda</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span><span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line">__global__ <span class="type">void</span> <span class="title function_">hello_world</span><span class="params">(<span class="type">void</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;hello world!);</span></span><br><span class="line"><span class="string">&#125;</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">int main(int argc, char **argv)</span></span><br><span class="line"><span class="string">&#123;</span></span><br><span class="line"><span class="string">    hello_world&lt;&lt;&lt;1, 10&gt;&gt;&gt;();</span></span><br><span class="line"><span class="string">    cudaDeviceReset();</span></span><br><span class="line"><span class="string">    return 0;</span></span><br><span class="line"><span class="string">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>下面我们具体审视一下这个简单的cuda程序。<br>（1）__global__前缀，cuda的精髓，即核函数。核函数的代码将在成千上万个线程上执行。<br>（2）cudaDeviceReset(),实现CPU和Device（即GPU）的同步，保证cpu和gpu一起退出程序。<br>  <em>大家这里先不用着急，后续我们还会具体谈cuda中执行单元的划分，并NVIDIA为我们提供的若干工具来分析编写并行程序。</em></p>
+<p>在异构环境中，主机host和设备device通过pcie总线通信。通信内容就包括了最重要的内存信息传递。CUDA上的内存管理API大体和cpu中相同，例如：<br><code>cudaMalloc()</code>诸如此类</p>
+<p>跑在总线上的一个重要API：<code>cudaMemcpy()</code>内存拷贝函数，可以实现DeviceToHost&#x2F;HostTODevice等等过程。</p>
+<h3 id="GPU架构"><a href="#GPU架构" class="headerlink" title="GPU架构"></a>GPU架构</h3><h3 id="线程管理"><a href="#线程管理" class="headerlink" title="线程管理"></a>线程管理</h3><p>下面我们进入到线程管理。首先，一个核函数只能有一个grid，每个grid可以分为多个block，每个block又可以分为多个thread。CUDA还为同一个block中的线程提供了共享内存机制，在每个block中单独划分出一块内存空间用于共享，通过关键词__shared__访问，拥有比全局内存更好的性能表现，这点后续我们也会详谈。</p>
+<h3 id="核函数"><a href="#核函数" class="headerlink" title="核函数"></a>核函数</h3><p><code>kernel_name&lt;&lt;&lt;grid,block&gt;&gt;&gt;</code><br>注意host端核函数执行是异步的，并且当主机发出执行核函数的指令后，会立即收回控制权。此刻就需要方法来使host和device同步，最常见的是使用<code>cudaMemcpy</code>来使host等待device数据，从而实现同步。</p>
+<p>在CUDA程序编写时，最常见的是将串行程序中的for循环并行化（这点在OpenMP和MPI中已经很熟悉了）</p>
+<h3 id="细谈线程束Warp"><a href="#细谈线程束Warp" class="headerlink" title="细谈线程束Warp"></a>细谈线程束Warp</h3><h3 id="CUDA中的同步"><a href="#CUDA中的同步" class="headerlink" title="CUDA中的同步"></a>CUDA中的同步</h3><p>无论是pthread中的🔓还是openmp，都有相应的同步机制，CUDA为避免内存竞争，也有同步方法。<code>__syncthread()</code>可以实现同block内的线程同步，想要同步不同block的线程，方法是借助核函数执行。</p>
+<h3 id="CUDA并行性能分析"><a href="#CUDA并行性能分析" class="headerlink" title="CUDA并行性能分析"></a>CUDA并行性能分析</h3><p>这里我们使用简单的矩阵加法为例来进行实验分析，硬件平台为RTX3060</p>
+<h3 id="分析工具介绍"><a href="#分析工具介绍" class="headerlink" title="分析工具介绍"></a>分析工具介绍</h3><ul>
+<li>nvprof：</li>
+</ul>
+<h3 id="动态并行"><a href="#动态并行" class="headerlink" title="动态并行"></a>动态并行</h3><p>动态并行或者叫他嵌套并行，类似于父进程&#x2F;子进程的概念。</p>
+<h2 id="2-CUDA内存"><a href="#2-CUDA内存" class="headerlink" title="2.CUDA内存"></a>2.CUDA内存</h2><ul>
+<li>寄存器</li>
+<li>共享内存</li>
+<li>常量内存</li>
+<li>全局内存</li>
+<li>纹理内存</li>
+<li>本地内存</li>
+</ul>
+<h3 id="内存管理"><a href="#内存管理" class="headerlink" title="内存管理"></a>内存管理</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">cudaMelloc() <span class="comment">//分配内存</span></span><br><span class="line">cudaMemset() <span class="comment">//初始化内存</span></span><br><span class="line">cudaFree() <span class="comment">//释放内存</span></span><br><span class="line">cudaemcpy() <span class="comment">//传输内存</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="特殊内存"><a href="#特殊内存" class="headerlink" title="特殊内存"></a>特殊内存</h3><p>固定内存：固定内存传输速更快，但是分配和释放成本更高</p>
+<p>零拷贝内存：<br>统一内存寻址：<code>cudaMallocManaged()</code></p>
+<h3 id="内存访问模式"><a href="#内存访问模式" class="headerlink" title="内存访问模式"></a>内存访问模式</h3><blockquote>
+<p>这部分内容至关重要，对于程序调优来说，记得代码验证</p>
+</blockquote>
+<p>1.对齐合并内存访问，减少带宽浪费<br>2.足够的并发内存操作，隐藏内存延迟</p>
+<h3 id="共享内存"><a href="#共享内存" class="headerlink" title="共享内存"></a>共享内存</h3>
+    </div>
+
+    
+        <hr class="fhr">
+        <div id="vcomments"></div>
+    
+</div>
+    <div class="footer" id="footer">
+    <p><h4>Copyright © 2020 | Author: BornHan | Theme By <a class="theme-author" target="_blank" rel="noopener" href="https://github.com/Xunzhuo/hexo-theme-coder" style="font-size:14px; color: #969696">Coder</a></h4>
+    
+        <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+        <span id="busuanzi_container_site_pv">Page Views: <span id="busuanzi_value_site_pv"></span></span>
+        <span class="post-meta-divider">|</span>
+        <span id="busuanzi_container_site_uv">Unique Visitors: <span id="busuanzi_value_site_uv"></span></span>
+    
+    <label class="el-switch el-switch-blue el-switch-sm" style="vertical-align: sub;">
+        <input type="checkbox" name="switch" id="update_style">
+        <span class="el-switch-style"></span>
+    </label>
+
+    <!--         <script type="text/javascript">
+    var cnzz_protocol = (("https:" == document.location.protocol) ? "https://" : "http://");
+    document.write(unescape("%3Cspan id='cnzz_stat_icon_1278548644'%3E%3C/span%3E%3Cscript src='" + cnzz_protocol + "v1.cnzz.com/stat.php%3Fid%3D1278548644%26show%3Dpic1' type='text/javascript'%3E%3C/script%3E"));
+    </script> -->
+</p>
+</div>
+
+<input type="hidden" id="web_style" value="black">
+<input type="hidden" id="valine_appid" value="">
+<input type="hidden" id="valine_appKey" value="">
+
+<script src="/libs/jquery.min.js"></script>
+
+
+<script src="/libs/highlight/highlight.pack.js"></script>
+
+<script src='//cdn.jsdelivr.net/npm/valine@1.3.10/dist/Valine.min.js'></script>
+
+<script src="/js/js.js"></script>
+
+<style type="text/css">
+.v * {
+color: #698fca;
+}
+.v .vlist .vcard .vhead .vsys {
+color: #3a3e4a;
+}
+.v .vlist .vcard .vh .vmeta .vat {
+color: #638fd5;
+}
+.v .vlist .vcard .vhead .vnick {
+color: #6ba1ff;
+}
+.v a {
+color: #8696b1;
+}
+.v .vlist .vcard .vhead .vnick:hover {
+color: #669bfc;
+}
+</style>
+    <script type="text/javascript" color="173,174,173" opacity='1' zIndex="-2" count="99" src="//cdn.bootcss.com/canvas-nest.js/1.0.0/canvas-nest.min.js"></script>
+</body>
+</html>
